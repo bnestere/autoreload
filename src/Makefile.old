@@ -1,0 +1,12 @@
+BC_OPTS=-flto -Wl,-plugin-opt=emit-llvm
+PREFIX=/usr/local
+
+thread_tester: so
+	g++ autoreload.c  thread_tester.c -o xthrdtester -lrt -pthread -fno-stack-protector
+
+so: autoreload.cpp
+	g++ -shared -o libautoreload.so -fPIC autoreload.cpp  -pthread -L/home/bnestere/r/lib -lacc_timer 
+
+so_install: so
+	sudo cp libautoreload.so $(PREFIX)/lib64
+	sudo cp autoreload.hpp $(PREFIX)/include
