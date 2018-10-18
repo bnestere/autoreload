@@ -36,6 +36,12 @@ static acc_timer_ctx_t *acc_timer = NULL;
 vector<int> reset_tids;
 mutex reset_tids_lock;
 
+/*
+ * Tests if a tid should be reloaded or not
+ *
+ * TODO: Probably not needed, because all threads that should be
+ *       reloaded are in reset_tids..
+ */
 int should_reload(int test_tid) {
   if(find(reset_tids.begin(), reset_tids.end(), test_tid) != reset_tids.end()) {
     return 1;
@@ -51,18 +57,17 @@ void register_reloadable() {
   reset_tids_lock.unlock();
 }
 
-void do_reload(int signo) {
-  int tid = syscall(__NR_gettid);
-  int pid = getpid();
-  printf("TID %d received SIGUSR1\n", tid);
-
-
-  cleanup_fptr();
-  reload_fptr();
-
-  // Assume the application finished normally, so just quit..
-  pthread_exit(0);
-}
+//void do_reload(int signo) {
+//  int tid = syscall(__NR_gettid);
+//  int pid = getpid();
+//  printf("TID %d received SIGUSR1\n", tid);
+//
+//  cleanup_fptr();
+//  reload_fptr();
+//
+//  // Assume the application finished normally, so just quit..
+//  pthread_exit(0);
+//}
 
 void on_sigbus_notify_threads(int signo) {
 	if(acc_timer != NULL) {
@@ -76,6 +81,12 @@ void on_sigbus_notify_threads(int signo) {
   sprintf(taskdir, "/proc/%d/task", pid);
   printf("Did sprintf %s\n", taskdir);
 
+  /*
+   * Read threads from the directory to know who should be reloaded.
+   * Probably no longer needed because of register_reloadable.
+   *
+   * TODO: No longer needed
+   */
   DIR *d;
   struct dirent *dir;
   d = opendir(taskdir);
@@ -132,29 +143,33 @@ void on_sigbus_notify_threads(int signo) {
   }
 }
 
+/*
+ * Handler to just perform cleanup
+ */
 void cleanup_handler(int signo) {
   printf("cleanup_handler()::begin\n");
   cleanup_fptr();
   printf("cleanup_handler()::end\n");
 }
 
+/*
+ * Use sigactions to set up signal handlers for reloading
+ */
 void register_autoreload(void (*_reload_fptr)(), void (*_cleanup_fptr)(), acc_timer_ctx_t *_acc_timer) {
-  //static struct sahandler sa
+
   printf("register_autoreload()::begin\n");
+
   static struct sigaction sa = {};
-  //sa.sa_handler = cleanup_handler;
   sa.sa_handler = on_sigbus_notify_threads;
   sa.sa_flags = SA_NODEFER;  
   sigaction(SIGBUS, &sa, NULL);;
 
   static struct sigaction sa2 = {};
-  //sa2.sa_handler = do_reload;
   sa2.sa_handler = cleanup_handler;
   sa2.sa_flags = SA_NODEFER;  
   sigaction(SIGUSR1, &sa2, NULL);;
 
   static struct sigaction sa3 = {};
-  //sa3.sa_handler = do_reload;
   sa3.sa_handler = cleanup_handler;
   sa3.sa_flags = SA_NODEFER;  
   sigaction(SIGUSR2, &sa3, NULL);;
@@ -163,9 +178,5 @@ void register_autoreload(void (*_reload_fptr)(), void (*_cleanup_fptr)(), acc_ti
   cleanup_fptr = _cleanup_fptr;
 	acc_timer = _acc_timer;
 
-//  static struct sigaction sa3 = {};
-//  sa3.sa_handler = reload_others;
-//  sa3.sa_flags = SA_NODEFER;  
-//  sigaction(SIGUSR2, &sa3, NULL);;
   printf("register_autoreload()::end\n");
 }
