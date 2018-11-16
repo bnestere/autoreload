@@ -1,6 +1,6 @@
 CC=gcc
 CXX=g++
-CFLAGS=-g -O3
+CFLAGS=-g -O3 -std=c++11
 LDFLAGS=-lm 
 
 SRC_FILES=autoreload.cpp 
